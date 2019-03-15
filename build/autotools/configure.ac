@@ -6,6 +6,7 @@ AC_PREREQ(2.59)
 AC_INIT([wraith],[],[wraith@botpack.net])
 AC_CONFIG_SRCDIR(src/eggdrop.h)
 AC_CONFIG_HEADER(src/config.h)
+AC_CONFIG_AUX_DIR([build/autotools])
 AC_COPYRIGHT([Copyright (c) Bryan Drewery])
 AC_REVISION($Revision$)
 
@@ -15,11 +16,13 @@ EGG_SAVE_PARAMETERS
 dnl Search for newer gcc versions before older
 #AC_REQUIRE_CPP
 AC_LANG([C++])
-AC_PROG_CXX([g++49 g++-4.9 g++48 g++-4.8 g++47 g++-4.7 clang++ g++46 g++-4.6 g++45 g++-4.5 g++-4.4 g++-4.4.1 g++-4.4.2 g++-4.4.0 g++44 g++4 eg++ g++-3.3 g++33 g++-3 g++3 g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC])
-dnl AC_PROG_CC([gcc34 gcc-3.4 gcc33 gcc3 gcc-3.3 gcc cc c1])
+AC_PROG_CXX([clang++80 clang++70 clang++60 clang++50 clang++40 clang++39 clang++38 clang++37 clang++36 clang++35 clang++34 g++8 g++7 g++6 g++5 clang++ eg++ g++ c++ CC cxx cc++])
+CC="${CXX} -x c"
+AC_SUBST(CC)
 AC_REQUIRE_CPP
-AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
+AX_CXX_COMPILE_STDCXX_14([noext], [mandatory])
 EGG_CHECK_CC
+#CXX_RPATH_CHECK
 
 #checkpoint
 AC_CACHE_SAVE 
@@ -28,8 +31,41 @@ AC_CACHE_SAVE
 EGG_CHECK_CCWALL
 EGG_CHECK_CCPIPE
 CXX_FLAG_CHECK([CXXFLAGS], [-fcolor-diagnostics], [colordiagnostics])
-CXX_FLAG_CHECK([CXXFLAGS], [-Qunused-arguments], [unusedarguments])
-CXX_FLAG_CHECK([DEBCXXFLAGS], [-fstack-protector-all], [stackprotector])
+#CXX_FLAG_CHECK([CXXFLAGS], [-Qunused-arguments], [unusedarguments])
+CXX_FLAG_CHECK_NO([CXXFLAGS], [-Winvalid-source-encoding], [-Wno-invalid-source-encoding], [invalid_source_encoding])
+CXX_FLAG_CHECK_NO([CXXFLAGS], [-Wnarrowing], [-Wno-narrowing], [nonarrowing])
+CXX_FLAG_CHECK_NO([CXXFLAGS], [-Wcast-function-type], [-Wno-cast-function-type], [no_cast_function_type])
+CXX_FLAG_CHECK([CXXFLAGS], [-Wimplicit-fallthrough=0], [wimplicit_fallthrough])
+CXX_FLAG_CHECK([CXXFLAGS], [-fstack-protector], [stackprotector])
+CXX_FLAG_CHECK([CXXFLAGS], [-fstack-protector-strong], [stackprotectorstrong])
+if [[ "${ax_cv_prog_cc_stackprotectorstrong}" = "yes" ]]; then
+  LDFLAGS="${LDFLAGS} -fstack-protector-strong"
+elif [[ "${ax_cv_prog_cc_stackprotector}" = "yes" ]]; then
+  LDFLAGS="${LDFLAGS} -fstack-protector"
+fi
+CXX_FLAG_CHECK([DEBCXXFLAGS], [-Og], [Og])
+if [[ "${ax_cv_prog_cc_Og}" = "no" ]]; then
+  DEBCXXFLAGS="${DEBCXXFLAGS} -O0"
+fi
+CXX_FLAG_CHECK_LINK([DEBCXXFLAGS], [-fsanitize=address], [fsanitize_address])
+if [[ "${ax_cv_prog_cc_fsanitize_address}" = "yes" ]]; then
+  DEBLDFLAGS="${DEBLDFLAGS} -fsanitize=address"
+  DEBCXXFLAGS="${DEBCXXFLAGS} -D__SANITIZE_ADDRESS__"
+fi
+CXX_FLAG_CHECK([DEBCXXFLAGS], [-fstack-protector-all], [stackprotectorall])
+CXX_FLAG_CHECK([DEBCXXFLAGS], [-Wsuggest-attribute=pure -Wsuggest-attribute=const], [wsuggest_attribute])
+CXX_FLAG_CHECK([DEBCXXFLAGS], [-Wconditional-uninitialized], [w_conditional_uninitialized])
+CXX_FLAG_CHECK([LDFLAGS], [-static-libstdc++], [static_libstdcxx])
+#CXX_FLAG_CHECK([LDFLAGS], [-static-libgcc], [static_libgcc])
+if [[ "${ax_cv_prog_cc_static_libstdcxx}" = "yes" ]]; then
+  AC_MSG_CHECKING([for static libstdc++])
+  AC_TRY_LINK([], [], [AC_MSG_RESULT(OK)],
+    [
+     AC_MSG_RESULT([not found.])
+     AC_MSG_ERROR([Static libstdc++ is rquired to build.], 1)
+    ]
+  )
+fi
 
 EGG_CHECK_DEPMODE
 
@@ -46,8 +82,6 @@ AC_CHECK_PROG(OBJCOPY, objcopy, [objcopy --remove-section=.note --remove-section
 AC_CHECK_PROG(STRIP, strip, strip, touch)
 AC_CHECK_PROG(DIFF, gdiff, gdiff, diff)
 AC_CHECK_PROG(UNAME, uname, uname)
-AC_CHECK_PROG(CCACHE, ccache, ccache)
-AC_CHECK_PROG(DISTCC, distcc, distcc)
 
 # Test the os and set the module linking settings
 EGG_CHECK_OS
@@ -62,14 +96,15 @@ EGG_CHECK_RANDOM_MAX
 
 # Create static binaries
 EGG_CHECK_CCSTATIC
-AC_SUBST(CCDEBUG)dnl
 AC_SUBST(DEBCXXFLAGS)
+AC_SUBST(DEBLDFLAGS)
 
 #checkpoint
 AC_CACHE_SAVE 
 
 # Checks for system libraries
 EGG_CHECK_LIBS
+CHECK_LIBELF
 
 # Checks for header files
 AC_HEADER_DIRENT
@@ -79,13 +114,13 @@ AC_HEADER_STAT
 #checkpoint
 AC_CACHE_SAVE 
 AC_CHECK_HEADERS([stdarg.h arpa/inet.h fcntl.h limits.h locale.h netdb.h netinet/in.h])
-AC_CHECK_HEADERS([sys/file.h sys/ioctl.h sys/param.h sys/socket.h wchar.h sys/ptrace.h paths.h sys/prctl.h])
+AC_CHECK_HEADERS([sys/file.h sys/ioctl.h sys/param.h sys/socket.h wchar.h])
+AC_CHECK_HEADERS([sys/ptrace.h paths.h sys/prctl.h sys/procctl.h])
 
 #checkpoint
 AC_CACHE_SAVE
 #AC_CHECK_HEADERS(openssl/ssl.h openssl/crypto.h)
 #AC_CHECK_HEADERS(zlib.h)
-#EGG_CHECK_ZLIB
 CHECK_SSL
 
 # TCL checks
@@ -145,8 +180,6 @@ EGG_TCL_LIB_REQS
 
 AC_CACHE_SAVE
 
-#AC_SUBST(ZLIB)dnl
-
 # Checks for typedefs, structures, and compiler characteristics
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
@@ -183,24 +216,17 @@ AC_STRUCT_TIMEZONE
 AC_STRUCT_TM
 
 # Checks for library functions
-AC_FUNC_FORK
-AC_FUNC_LSTAT
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_FUNC_MALLOC
-AC_FUNC_MKTIME
 AC_FUNC_MMAP
-AC_FUNC_REALLOC
-AC_FUNC_STAT
 EGG_FUNC_TIMESPEC
-AC_FUNC_STRFTIME
 
 #checkpoint
 AC_CACHE_SAVE
-AC_CHECK_FUNCS([clock fsync getrusage isascii getpassphrase])
-AC_CHECK_FUNCS([memcpy memset random rename snprintf srandom gettime])
+AC_CHECK_FUNCS([getrusage getpassphrase posix_madvise madvise])
+AC_CHECK_FUNCS([memmem random snprintf srandom gettime])
 #checkpoint
 AC_CACHE_SAVE
-AC_CHECK_FUNCS([strcasecmp strncasecmp vsnprintf inet_ntop])
+AC_CHECK_FUNCS([vsnprintf prctl procctl closefrom])
 
 #autoscan suggested this....
 #These are recommended by autoscan, but no code supports it currently
@@ -218,11 +244,9 @@ AC_CACHE_SAVE
 
 EGG_SUBST_VERSION
 #FIND_WRAPS
-EGG_SUBST_MOD_UPDIR
 DO_DEPS
 
-AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile src/compat/Makefile src/crypto/Makefile src/mod/Makefile src/buildinfo.h])
-AC_OUTPUT
+AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile src/buildinfo.h])
 
 AH_TEMPLATE(HAVE_ST_MTIM, [Define to 1 if your struct stat has an st_mtim member])
 AH_TEMPLATE(HAVE_ST_MTIMESPEC, [Define to 1 if your struct stat has an st_mtimespec member])
@@ -250,17 +274,22 @@ fi
 if test -d .git; then
   git submodule init
   git submodule update
+  git submodule foreach --recursive git clean -fdx
+  # Restore as it may have been removed by an older 'make distclean'
+  if ! test -f src/response.h; then
+    git checkout src/response.h
+  fi
 fi
 ]
 
-CXX="$CXX" TCL_INCLUDES="$TCL_INCLUDES" SSL_INCLUDES="$SSL_INCLUDES" SED="$SED" src/generate_defs.sh
-[
-if [ $? -ne 0 ]; then
-  exit 1
+export CC CXX
+if [[ -f lib/bdlib/configure ]]; then
+  AC_CONFIG_SUBDIRS([lib/bdlib])
 fi
-]
+if [[ -n "${LIBELF_BUNDLED}" ]] && [[ -f lib/libelf/configure ]]; then
+  AC_CONFIG_SUBDIRS([lib/libelf])
+fi
+AC_OUTPUT
 
-echo ""
-echo ""
-echo "------------ Configuring BDLIB ------------"
-test -f lib/bdlib/configure && cd lib/bdlib && CXX="$CXX" ./configure
+CXX="$CXX" CXXFLAGS="$CXXFLAGS" TCL_INCLUDES="$TCL_INCLUDES" SSL_INCLUDES="$SSL_INCLUDES" \
+  SED="$SED" src/generate_defs.sh || exit 1

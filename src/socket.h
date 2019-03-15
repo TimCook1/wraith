@@ -14,8 +14,8 @@ int get_addr(const char *, my_addr_t *);
 
 /* can be static if ever combined with net.h or a more integrated 1.9 is used ... */
 typedef struct {
-        int len;
         int family;
+        socklen_t len;
         union {
                 struct sockaddr addr;
                 struct sockaddr_in ipv4;
@@ -40,7 +40,7 @@ int socket_get_name(int sock, char **ip, int *port);
 //int socket_get_peer_name(int sock, char **peer_ip, int *peer_port);
 //int socket_get_error(int sock);
 //int socket_accept(int sock, char **peer_ip, int *peer_port);
-int is_dotted_ip(const char *ip);
+int is_dotted_ip(const char *ip) __attribute__((pure));
 int socket_ip_to_uint(const char *ip, unsigned int *longip);
 int socket_ipv6_to_dots(const char *ip, char *dots);
 

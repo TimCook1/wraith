@@ -71,6 +71,7 @@ struct dcc_t {
 #ifdef USE_IPV6
   char host6[121];              /* easier.. ipv6 address in regular notation (3ffe:80c0:225::) */
 #endif /* USE_IPV6 */
+  int8_t cflags;	 	/* Color status flags. */
 };
 
 struct dns_info {
@@ -240,6 +241,6 @@ void send_timesync(int);
 void failed_link(int);
 void dupwait_notify(const char *);
 void send_sysinfo();
-int ansi_len(char *);
+int ansi_len(const char *) __attribute__((pure));
 
 #endif /* !_DCC_H */

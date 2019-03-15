@@ -12,8 +12,6 @@
 #include <bdlib/src/String.h>
 #include <bdlib/src/HashTable.h>
 
-#define DO_LOST 1
-#define NO_LOST 0
 #define DEQ_RATE 200
 
 #define fixcolon(x)             do {                                    \
@@ -76,7 +74,7 @@ void release_nick(const char* = NULL);
 #define check_bind_ctcp(a, b, c, d, e, f) check_bind_ctcpr(a, b, c, d, e, f, BT_ctcp)
 #define check_bind_ctcr(a, b, c, d, e, f) check_bind_ctcpr(a, b, c, d, e, f, BT_ctcr)
 
-bool detect_avalanche(char *);
+bool detect_avalanche(const char *) __attribute__((pure));
 void server_report(int, int);
 void server_init();
 void queue_server(int, char *, int);

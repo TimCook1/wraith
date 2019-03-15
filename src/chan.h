@@ -8,8 +8,38 @@
 #ifndef _EGG_CHAN_H
 #define _EGG_CHAN_H
 
+#include <functional>
+#include <memory>
 #include <lib/bdlib/src/Array.h>
+#include <lib/bdlib/src/HashTable.h>
 #include <lib/bdlib/src/String.h>
+#include "RfcString.h"
+
+/* chan & global */
+enum flood_t {
+  FLOOD_PRIVMSG  = 0,
+  FLOOD_NOTICE   = 1,
+  FLOOD_CTCP     = 2,
+  FLOOD_NICK     = 3,
+  FLOOD_JOIN     = 4,
+  FLOOD_KICK     = 5,
+  FLOOD_DEOP     = 6,
+  FLOOD_PART     = 7,
+  FLOOD_BYTES    = 8
+};
+
+namespace std {
+  template<>
+  struct hash<flood_t>
+  {
+    inline size_t operator()(flood_t val) const {
+      return static_cast<size_t>(val);
+    }
+  };
+}
+
+#define FLOOD_CHAN_MAX   9
+#define FLOOD_GLOBAL_MAX 3
 
 typedef struct memstruct {
   struct memstruct *next;
@@ -22,6 +52,7 @@ typedef struct memstruct {
   int tried_getuser;
   unsigned short flags;
   char nick[NICKLEN];
+  std::shared_ptr<RfcString> rfc_nick;
   char userhost[UHOSTLEN];
   char userip[UHOSTLEN];
   char from[NICKLEN + UHOSTLEN];   /* nick!user@host */
@@ -29,20 +60,25 @@ typedef struct memstruct {
   bool is_me;
   bd::HashTable<flood_t, time_t>     *floodtime; // floodtime[FLOOD_PRIVMSG] = now;
   bd::HashTable<flood_t, int>         *floodnum; // floodnum[FLOOD_PRIVMSG] = 1;
+
+  void* operator new (size_t size) noexcept {
+    return calloc(1, size);
+  }
+  void operator delete (void* p) noexcept {
+    free(p);
+  }
 } memberlist;
 
-#include <bdlib/src/bdlib.h>
-BDLIB_NS_BEGIN
-template<typename T>
-  struct Hash;
-
-template<>
-  struct Hash<memberlist*>
+namespace std {
+  template<>
+  struct hash<memberlist*>
   {
     // Use memory address
-    inline size_t operator()(memberlist* m) const { return reinterpret_cast<size_t>(m); }
+    inline size_t operator()(memberlist* m) const {
+      return reinterpret_cast<size_t>(m);
+    }
   };
-BDLIB_NS_END
+}
 
 #define CHAN_FLAG_OP	1
 #define CHAN_FLAG_VOICE 2
@@ -84,6 +120,12 @@ enum deflag_t {
   DEFLAG_KICK = 2,
   DEFLAG_DELETE = 3,
   DEFLAG_REACT = 4,
+};
+
+enum homechan_user_t {
+  HOMECHAN_USER_NONE = 0,
+  HOMECHAN_USER_VOICE = 1,
+  HOMECHAN_USER_OP = 2,
 };
 
 /* Why duplicate this struct for exempts and invites only under another
@@ -144,6 +186,8 @@ struct chan_t {
 
   // Member caching to cache cyclers
   bd::HashTable<bd::String, memberlist*> *cached_members;
+
+  bd::HashTable<RfcString, memberlist*> *hashed_members;
 };
 
 #define CHANINV    BIT0		/* +i					*/
@@ -219,6 +263,7 @@ struct chanset_t {
   deflag_t mdop;
   deflag_t mop;
   deflag_t revenge;
+  homechan_user_t homechan_user;
   int voice_non_ident;
   int ban_type;
   interval_t auto_delay;
@@ -257,6 +302,17 @@ struct chanset_t {
   char added_by[HANDLEN + 1];	/* who added the channel? */
   char dname[81];               /* what the users know the channel as like !eggdev */
   char name[81];                /* what the servers know the channel as, like !ABCDEeggdev */
+
+  // bitmask of roles for each bot
+  bd::HashTable<bd::String, int> *bot_roles;
+
+  // List of bots for each role
+  bd::HashTable<short, bd::Array<bd::String> > *role_bots;
+
+  // My role bitmask
+  int role;
+
+  int needs_role_rebalance;
 };
 
 /* behavior modes for the channel */
@@ -305,9 +361,6 @@ struct chanset_t {
 #define CHAN_STOP_CYCLE     BIT9	/* Some efnetservers have defined NO_CHANOPS_WHEN_SPLIT */
 
 /* prototypes */
-memberlist *ismember(const struct chanset_t *, const char *);
-struct chanset_t *findchan(const char *name);
-struct chanset_t *findchan_by_dname(const char *name);
 
 /* is this channel +s/+p? */
 #define channel_hidden(chan) (chan->channel.mode & (CHANPRIV | CHANSEC))

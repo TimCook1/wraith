@@ -43,12 +43,12 @@ TXT             16 text strings
 #include <bdlib/src/String.h>
 #include <bdlib/src/Array.h>
 
-typedef void (*dns_callback_t)(int, void *client_data, const char *query, bd::Array<bd::String> answers);
+typedef void (*dns_callback_t)(int, void *client_data, const char *query,
+    const bd::Array<bd::String>& answers);
 
 int egg_dns_init(void);
 //int egg_dns_shutdown(void);
 
-void egg_dns_send(char *query, int len);
 int egg_dns_lookup(const char *host, interval_t timeout, dns_callback_t callback, void *client_data, int type = (DNS_LOOKUP_A|DNS_LOOKUP_AAAA));
 bd::Array<bd::String> dns_lookup_block(const char *host, interval_t timeout, int type = (DNS_LOOKUP_A|DNS_LOOKUP_AAAA));
 int egg_dns_reverse(const char *ip, interval_t timeout, dns_callback_t callback, void *client_data);
@@ -58,7 +58,7 @@ void tell_dnsdebug(int);
 void dns_cache_flush();
 bool valid_dns_id(int, int);
 int reverse_ip(const char *host, char *reverse);
-bd::String dns_find_ip(bd::Array<bd::String> ips, int af_type);
+bd::String dns_find_ip(const bd::Array<bd::String>& ips, int af_type);
 
 extern int		dns_sock, dns_idx;
 extern const char	*dns_ip;
