@@ -993,7 +993,7 @@ static void init_channel(struct chanset_t *chan, bool reset)
     chan->role_bots = new bd::HashTable<short, bd::Array<bd::String> >;
     chan->role = 0;
   }
-  chan->needs_role_rebalance = 1;
+  chan->role_rebalance_cookie = 0;
 }
 
 static void clear_masklist(masklist *m)
@@ -1075,7 +1075,8 @@ void clear_channel(struct chanset_t *chan, bool reset)
 
 /* Create new channel and parse commands.
  */
-int channel_add(char *result, const char *newname, char *options, bool isdefault)
+int channel_add(char *result, const char *newname, const char *options,
+    bool isdefault)
 {
   /* When loading userfile */
   if (newname && newname[0] && loading && !strcmp(newname, "default"))
@@ -1203,14 +1204,17 @@ int channel_add(char *result, const char *newname, char *options, bool isdefault
    */
   if ((channel_modify(result, chan, items, (char **) item, 0) != OK)) {
     putlog(LOG_ERROR, "*", "Error parsing channel options for %s: %s", chan->dname, result);
-    if (!loading)
+    if (!loading) {
       ret = ERROR;
+      remove_channel(chan);
+      goto out;
+    }
   }
     
-
-  free(item);
   if (join && shouldjoin(chan))
     join_chan(chan);
+out:
+  free(item);
   return ret;
 }
 /* vim: set sts=2 sw=2 ts=8 et: */
